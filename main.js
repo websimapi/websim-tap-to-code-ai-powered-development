@@ -9,6 +9,7 @@ class TapToCode {
         this.ctx = this.canvas.getContext('2d');
         this.overlay = document.getElementById('overlay');
         this.status = document.getElementById('status');
+        this.inputOverlay = document.getElementById('input-overlay'); // Add this
         
         this.interpreter = new TapInterpreter();
         this.renderer = new CodeRenderer();
@@ -37,23 +38,30 @@ class TapToCode {
     }
     
     setupEventListeners() {
-        // Updated with better feedback
-        this.canvas.addEventListener('click', (e) => this.handleClick(e));
-        this.canvas.addEventListener('contextmenu', (e) => {
+        // Route all input through our overlay
+        this.inputOverlay.addEventListener('click', (e) => this.handleClick(e));
+        this.inputOverlay.addEventListener('contextmenu', (e) => {
             e.preventDefault();
             this.handleRightClick(e);
         });
         
-        // Touch support with better feedback
-        this.canvas.addEventListener('touchstart', (e) => {
+        // Touch support through overlay
+        this.inputOverlay.addEventListener('touchstart', (e) => {
             e.preventDefault();
             const touch = e.touches[0];
             const clickEvent = new MouseEvent('click', {
                 clientX: touch.clientX,
-                clientY: touch.clientY
+                clientY: touch.clientY,
+                bubbles: true,
+                cancelable: true
             });
             this.handleClick(clickEvent);
         });
+        
+        // Relay events to plugins
+        this.inputOverlay.addEventListener('mousedown', (e) => this.relayToPlugins(e));
+        this.inputOverlay.addEventListener('mouseup', (e) => this.relayToPlugins(e));
+        this.inputOverlay.addEventListener('mousemove', (e) => this.relayToPlugins(e));
         
         // Spacebar to clear current pattern
         document.addEventListener('keydown', (e) => {
@@ -64,6 +72,23 @@ class TapToCode {
         });
         
         window.addEventListener('resize', () => this.setupCanvas());
+    }
+    
+    relayToPlugins(event) {
+        // Create a new event with the same properties
+        const relayEvent = new event.constructor(event.type, {
+            bubbles: event.bubbles,
+            cancelable: event.cancelable,
+            clientX: event.clientX,
+            clientY: event.clientY,
+            ...event
+        });
+        
+        // Relay to all plugin elements
+        const plugins = document.querySelectorAll('[id^="plugin_"]');
+        plugins.forEach(plugin => {
+            plugin.dispatchEvent(relayEvent);
+        });
     }
     
     handleClick(e) {
@@ -81,6 +106,9 @@ class TapToCode {
         // Show live feedback
         this.updatePatternIndicator();
         this.analyzePattern();
+        
+        // Also relay the click to plugins
+        this.relayToPlugins(e);
     }
     
     handleRightClick(e) {
@@ -96,6 +124,9 @@ class TapToCode {
         
         this.updatePatternIndicator();
         this.analyzePattern();
+        
+        // Relay right click to plugins
+        this.relayToPlugins(e);
     }
     
     createClickEffect(x, y) {

@@ -258,3 +258,28 @@ body {
     pointer-events: none;
     user-select: none;
 }
+
+#input-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 9999;
+    pointer-events: auto;
+    cursor: crosshair;
+    touch-action: none;
+}
+
+#plugin-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+#plugin-container > div {
+    pointer-events: auto;
+}

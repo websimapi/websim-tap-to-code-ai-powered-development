@@ -36,23 +36,17 @@ export class AIService {
             messages: [
                 {
                     role: "system",
-                    content: `You are an AI pair programmer. Generate clean, modern web code based on user interactions.
-Focus on creating small, functional parts that can be built upon. Keep it simple and educational.
+                    content: `You are an AI pair programmer who responds to ANY user input, even single clicks.
+Generate working code based on the number and position of user taps/clicks.
 
-For a basic interaction, generate HTML/CSS/JS that creates a visual element at the interaction position.
-For multiple clicks, create components that show the relationship between those points.
+Rules:
+1. Respond to ANY number of clicks (1, 2, 3+)
+2. Create interactive web elements at the tap positions
+3. Make elements that respond to user interaction
+4. Include JavaScript that makes the page come alive
+5. Even single clicks should create something useful
 
-Respond with a JSON object containing only:
-{
-  "success": true,
-  "project": {
-    "files": {
-      "index.html": "<html_content>",
-      "styles.css": "<css_content>",
-      "script.js": "<js_content>"
-    }
-  }
-}`
+Respond with JSON: {"success": true, "project": {"files": {"index.html": "...", "styles.css": "...", "script.js": "..."}}}`
                 },
                 {
                     role: "user",
@@ -66,78 +60,82 @@ Respond with a JSON object containing only:
     }
     
     async generateWithMockAI(interpretation) {
-        // Fallback demo generation
-        const { action, type, positions } = interpretation;
+        const { positions, clickCount } = interpretation;
         
         let html = '', css = '', js = '';
         
-        if (positions.length === 1) {
-            // Single click - create a button
-            html = `
-<div class="interactive-button">
-    <button class="demo-btn">Click me!</button>
-</div>`;
+        if (clickCount === 1) {
+            // Single click - immediately create something
+            html = `<button class="magic-btn" style="left:${positions[0].x}px; top:${positions[0].y}px;">✨ Magic</button>`;
             css = `
-.interactive-button {
+.magic-btn {
     position: absolute;
-    left: ${positions[0].x}px;
-    top: ${positions[0].y}px;
-}
-.demo-btn {
-    padding: 15px 30px;
-    background: linear-gradient(135deg, #00ff88, #0066ff);
+    padding: 15px 25px;
+    background: linear-gradient(45deg, #ff006e, #00ff88);
     border: none;
-    border-radius: 25px;
+    border-radius: 30px;
     color: white;
     font-size: 16px;
     cursor: pointer;
+    transform: translate(-50%, -50%);
     transition: all 0.3s ease;
+    box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
 }
-.demo-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(0, 255, 136, 0.4);
+.magic-btn:hover {
+    transform: translate(-50%, -50%) scale(1.1);
+    box-shadow: 0 0 30px rgba(0, 255, 136, 0.8);
 }`;
             js = `
-document.querySelector('.demo-btn').addEventListener('click', () => {
-    alert('Hello from your tap-to-code demo!');
+document.querySelector('.magic-btn').addEventListener('click', (e) => {
+    e.target.style.background = \`linear-gradient(45deg, #${Math.floor(Math.random()*16777215).toString(16)}, #${Math.floor(Math.random()*16777215).toString(16)})\`;
+    e.target.textContent = '✨ ' + ['Amazing!', 'Cool!', 'Wow!', 'Nice!'][Math.floor(Math.random()*4)];
 });`;
-        } else if (positions.length === 2) {
-            // Double click - connect with a line
-            html = `<canvas id="demo-canvas" width="${window.innerWidth}" height="${window.innerHeight}"></canvas>`;
-            css = `#demo-canvas { position: absolute; top: 0; left: 0; }`;
+        } else if (clickCount === 2) {
+            // Two clicks - create a connection
+            html = `<div class="connection-line"></div>`;
+            css = `
+.connection-line {
+    position: absolute;
+    left: ${positions[0].x}px;
+    top: ${positions[0].y}px;
+    width: ${Math.sqrt(Math.pow(positions[1].x - positions[0].x, 2) + Math.pow(positions[1].y - positions[0].y, 2))}px;
+    height: 3px;
+    background: linear-gradient(90deg, #00ff88, #ff006e);
+    transform: rotate(${Math.atan2(positions[1].y - positions[0].y, positions[1].x - positions[0].x)}rad);
+    transform-origin: 0 50%;
+    box-shadow: 0 0 20px rgba(0, 255, 136, 0.8);
+    animation: pulse 2s infinite;
+}
+@keyframes pulse {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 1; }
+}`;
+            js = `// Connection line created between points`;
+        } else {
+            // 3+ clicks - create a shape
+            const points = positions.map(p => `${p.x}px ${p.y}px`).join(', ');
+            html = `<div class="user-shape"></div>`;
+            css = `
+.user-shape {
+    position: absolute;
+    width: 0;
+    height: 0;
+    border: 2px solid #00ff88;
+    box-shadow: 0 0 30px rgba(0, 255, 136, 0.5);
+    ${positions.length === 3 ? `clip-path: polygon(${points});` : ''}
+    background: rgba(0, 255, 136, 0.1);
+    animation: glow 3s infinite alternate;
+}
+@keyframes glow {
+    from { filter: brightness(1); }
+    to { filter: brightness(1.5); }
+}`;
             js = `
-const canvas = document.getElementById('demo-canvas');
-const ctx = canvas.getContext('2d');
-ctx.strokeStyle = '#00ff88';
-ctx.lineWidth = 3;
-ctx.beginPath();
-ctx.moveTo(${positions[0].x}, ${positions[0].y});
-ctx.lineTo(${positions[1].x}, ${positions[1].y});
-ctx.stroke();
-
-// Add glowing effect
-ctx.shadowBlur = 10;
-ctx.shadowColor = '#00ff88';
-ctx.stroke();`;
-        } else if (positions.length >= 3) {
-            // Multiple clicks - create a polygon
-            html = `<canvas id="polygon-canvas" width="${window.innerWidth}" height="${window.innerHeight}"></canvas>`;
-            css = `#polygon-canvas { position: absolute; top: 0; left: 0; }`;
-            js = `
-const canvas = document.getElementById('polygon-canvas');
-const ctx = canvas.getContext('2d');
-ctx.fillStyle = 'rgba(0, 255, 136, 0.3)';
-ctx.strokeStyle = '#00ff88';
-ctx.lineWidth = 2;
-
-ctx.beginPath();
-const points = ${JSON.stringify(positions)};
-ctx.moveTo(points[0].x, points[0].y);
-points.forEach(p => ctx.lineTo(p.x, p.y));
-ctx.closePath();
-
-ctx.fill();
-ctx.stroke();`;
+// Interactive shape created from user clicks
+document.querySelector('.user-shape').addEventListener('click', () => {
+    this.style.transform = 'scale(1.2)';
+    setTimeout(() => this.style.transform = 'scale(1)', 300);
+});`;
         }
         
         return {
@@ -153,8 +151,15 @@ ctx.stroke();`;
     }
     
     buildPrompt(interpretation) {
-        const { action, type, positions } = interpretation;
-        return `User ${action} action with ${positions.length} clicks at ${JSON.stringify(positions)}. Create engaging web content`;
+        const { positions, clickCount } = interpretation;
+        
+        if (clickCount === 1) {
+            return `User clicked at position (${positions[0].x}, ${positions[0].y}). Create an interactive button or element at this exact position.`;
+        } else if (clickCount === 2) {
+            return `User clicked at two positions: (${positions[0].x}, ${positions[0].y}) and (${positions[1].x}, ${positions[1].y}). Create something that connects or relates these two points.`;
+        } else {
+            return `User clicked ${clickCount} times at positions: ${JSON.stringify(positions)}. Create an interactive drawing or shape using these points.`;
+        }
     }
     
     showProgress(show = true) {

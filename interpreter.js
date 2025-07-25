@@ -12,58 +12,23 @@ export class TapInterpreter {
     }
     
     interpret(pattern, project) {
-        const recentClicks = pattern.clicks;
+        // Always interpret - no pattern validation
+        const clickCount = pattern.clicks?.length || 0;
         
-        // Detect basic patterns
-        if (recentClicks.length === 1) {
-            return {
-                action: 'create',
-                type: 'file',
-                position: recentClicks[0],
-                project
-            };
+        if (clickCount === 0) {
+            return { action: 'ask', type: 'start', project };
         }
         
-        if (recentClicks.length === 2) {
-            const distance = this.calculateDistance(
-                recentClicks[0], 
-                recentClicks[1]
-            );
-            
-            if (distance < 50) {
-                return {
-                    action: 'create',
-                    type: 'component',
-                    position: this.getCenter(recentClicks),
-                    project
-                };
-            } else {
-                return {
-                    action: 'connect',
-                    type: 'link',
-                    from: recentClicks[0],
-                    to: recentClicks[1],
-                    project
-                };
-            }
-        }
-        
-        // Detect shapes
-        const shape = this.detectShape(recentClicks);
-        if (shape) {
-            return {
-                action: 'create',
-                type: shape,
-                positions: recentClicks,
-                project
-            };
-        }
-        
+        // Always create something based on click count and positions
         return {
-            action: 'ask',
-            type: 'clarify',
-            positions: recentClicks,
-            project
+            action: 'create',
+            type: clickCount === 1 ? 'single-element' :
+                   clickCount === 2 ? 'connection' :
+                   clickCount === 3 ? 'triangle' :
+                   clickCount === 4 ? 'rectangle' : 'shape',
+            positions: pattern.clicks || [],
+            project,
+            clickCount
         };
     }
     
@@ -115,4 +80,3 @@ export class TapInterpreter {
         return null;
     }
 }
-

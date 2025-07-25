@@ -133,77 +133,112 @@ class TapToCode {
     }
     
     async analyzePattern() {
-        const pattern = this.patterns.detect(this.clicks);
+        // Remove strict pattern detection - respond to any clicks
+        if (this.clicks.length === 0) return;
         
-        if (pattern) {
-            this.showPatternRecognition(pattern);
-            this.status.textContent = `Pattern detected: ${pattern.type}`;
-            await this.interpretPattern(pattern);
-        } else {
-            this.status.textContent = `${this.clicks.length} points - Keep clicking or press space to reset`;
-        }
-    }
-    
-    showPatternRecognition(pattern) {
-        const effect = document.createElement('div');
-        effect.className = 'pattern-recognition';
-        effect.style.left = pattern.centerX + 'px';
-        effect.style.top = pattern.centerY + 'px';
+        // Always interpret, even with just 1 click
+        this.status.textContent = `Processing ${this.clicks.length} points...`;
         
-        // Add label
-        const label = document.createElement('div');
-        label.textContent = pattern.type;
-        label.style.position = 'absolute';
-        label.style.left = '50%';
-        label.style.top = '50%';
-        label.style.transform = 'translate(-50%, -50%)';
-        label.style.color = '#00ff88';
-        label.style.fontSize = '14px';
-        effect.appendChild(label);
+        // Create a simple pattern object with all clicks
+        const pattern = {
+            type: 'user-input',
+            clicks: this.clicks,
+            centerX: this.clicks.reduce((sum, c) => sum + c.x, 0) / this.clicks.length,
+            centerY: this.clicks.reduce((sum, c) => sum + c.y, 0) / this.clicks.length
+        };
         
-        document.body.appendChild(effect);
-        setTimeout(() => effect.remove(), 2000);
+        await this.interpretPattern(pattern);
     }
     
     async interpretPattern(pattern) {
         try {
-            const interpretation = await this.interpreter.interpret(pattern, this.currentProject);
+            // Always send to AI - no pattern validation
+            const interpretation = {
+                action: 'create',
+                type: 'interactive-element',
+                positions: pattern.clicks,
+                project: this.currentProject,
+                clickCount: pattern.clicks.length
+            };
             
-            if (interpretation.action) {
-                await this.executeAction(interpretation);
-            }
+            await this.executeAction(interpretation);
         } catch (error) {
-            this.status.textContent = 'Error interpreting pattern - Try again';
-            this.clicks = [];
+            console.error('Interpretation error:', error);
+            this.status.textContent = 'Generating response...';
+            await this.executeAction({
+                action: 'create',
+                type: 'fallback-element',
+                positions: this.clicks,
+                project: this.currentProject,
+                clickCount: this.clicks.length
+            });
         }
     }
     
     async executeAction(interpretation) {
-        this.status.textContent = 'Generating code...';
-        
         try {
+            this.showProgress(true);
+            this.status.textContent = 'AI is thinking...';
+            
             const result = await this.ai.generateCode(interpretation);
             
             if (result.success) {
                 this.currentProject = result.project;
                 this.renderer.render(result.project);
-                this.status.textContent = 'Code generated! Tap for new pattern';
+                
+                // Show what was created
+                const createdType = result.project.files['index.html'] ? 
+                    result.project.files['index.html'].includes('button') ? 'button' : 
+                    result.project.files['index.html'].includes('canvas') ? 'drawing' : 'element' : 'code';
+                
+                this.status.textContent = `Created ${createdType}! Tap to add more...`;
                 this.showCodePanel();
-                this.clicks = [];
-            } else if (result.fallback) {
-                // Use the fallback
-                this.currentProject = result.fallback.project;
-                this.renderer.render(result.fallback);
-                this.status.textContent = 'Demo mode - Working offline';
-                this.showCodePanel();
-                this.clicks = [];
-            } else {
-                throw new Error('Generation failed');
+                
+                // Keep clicks for building on, but reset after 3 seconds of inactivity
+                this.scheduleClickReset();
             }
         } catch (error) {
             console.error('Action failed:', error);
-            this.status.textContent = 'Try different pattern';
+            this.status.textContent = 'Tap anywhere to start...';
             this.clicks = [];
+        } finally {
+            this.showProgress(false);
+        }
+    }
+    
+    scheduleClickReset() {
+        clearTimeout(this.resetTimeout);
+        this.resetTimeout = setTimeout(() => {
+            this.clicks = [];
+            this.status.textContent = 'Ready for new input - Tap anywhere...';
+        }, 3000);
+    }
+    
+    showProgress(show = true) {
+        const progressBar = document.getElementById('progress-bar');
+        const aiThinking = document.getElementById('ai-thinking');
+        
+        if (show) {
+            progressBar.style.display = 'block';
+            aiThinking.textContent = 'AI working...';
+            
+            // Animate progress
+            let progress = 0;
+            const animate = () => {
+                progress += Math.random() * 15;
+                if (progress < 90) {
+                    progressBar.style.setProperty('--progress', progress + '%');
+                    requestAnimationFrame(animate);
+                }
+            };
+            animate();
+        } else {
+            progressBar.style.setProperty('--progress', '100%');
+            aiThinking.textContent = 'AI listening...';
+            setTimeout(() => {
+                progressBar.style.display = 'none';
+                progressBar.style.setProperty('--progress', '0%');
+            }, 500);
         }
     }
     

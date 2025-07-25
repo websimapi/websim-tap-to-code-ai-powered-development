@@ -12,21 +12,30 @@ export class TapInterpreter {
     }
     
     interpret(pattern, project) {
-        // Always interpret - no pattern validation
+        // Enhanced interpretation with better user input understanding
         const clickCount = pattern.clicks?.length || 0;
         
         if (clickCount === 0) {
             return { action: 'ask', type: 'start', project };
         }
         
-        // Always create something based on click count and positions
+        // Analyze spatial relationships
+        const positions = pattern.clicks || [];
+        const analysis = {
+            count: clickCount,
+            positions,
+            spread: this.calculateSpread(positions),
+            timing: this.analyzeTiming(pattern.clicks),
+            shape: this.detectShape(positions),
+            density: this.calculateDensity(positions)
+        };
+        
+        // Create contextual interpretation
         return {
             action: 'create',
-            type: clickCount === 1 ? 'single-element' :
-                   clickCount === 2 ? 'connection' :
-                   clickCount === 3 ? 'triangle' :
-                   clickCount === 4 ? 'rectangle' : 'shape',
-            positions: pattern.clicks || [],
+            type: this.determinePluginType(analysis),
+            analysis,
+            positions,
             project,
             clickCount
         };
@@ -78,5 +87,61 @@ export class TapInterpreter {
         if (isLine) return 'line';
         
         return null;
+    }
+    
+    calculateSpread(positions) {
+        if (positions.length < 2) return 0;
+        const center = this.getCenter(positions);
+        return positions.reduce((sum, p) => 
+            sum + Math.sqrt(Math.pow(p.x - center.x, 2) + Math.pow(p.y - center.y, 2)), 0
+        ) / positions.length;
+    }
+    
+    calculateDensity(positions) {
+        if (positions.length < 2) return 0;
+        const bounds = this.getBounds(positions);
+        const area = bounds.width * bounds.height;
+        return positions.length / Math.max(area, 1);
+    }
+    
+    getBounds(positions) {
+        const x = positions.map(p => p.x);
+        const y = positions.map(p => p.y);
+        return {
+            minX: Math.min(...x),
+            maxX: Math.max(...x),
+            minY: Math.min(...y),
+            maxY: Math.max(...y),
+            width: Math.max(...x) - Math.min(...x),
+            height: Math.max(...y) - Math.min(...y)
+        };
+    }
+    
+    analyzeTiming(clicks) {
+        if (clicks.length < 2) return { rhythm: 'single', speed: 0 };
+        const intervals = [];
+        for (let i = 1; i < clicks.length; i++) {
+            intervals.push(clicks[i].timestamp - clicks[i-1].timestamp);
+        }
+        const avg = intervals.reduce((a,b) => a + b) / intervals.length;
+        return {
+            rhythm: avg < 200 ? 'rapid' : avg < 500 ? 'normal' : 'slow',
+            speed: avg,
+            intervals
+        };
+    }
+    
+    determinePluginType(analysis) {
+        const { count, spread, shape, density } = analysis;
+        
+        if (count === 1) return 'interactive-element';
+        if (count === 2) return 'connection-system';
+        if (count === 3) return 'triangle-formation';
+        if (shape === 'circle') return 'orbital-system';
+        if (shape === 'line') return 'pathway';
+        if (density > 0.01) return 'clustered-system';
+        if (spread > 200) return 'distributed-system';
+        
+        return 'multi-point-system';
     }
 }

@@ -183,16 +183,11 @@ class TapToCode {
             const result = await this.ai.generateCode(interpretation);
             
             if (result.success) {
-                this.currentProject = result.project;
-                this.renderer.render(result.project);
+                // Execute the generated code directly
+                await this.executeGeneratedCode(result.project);
                 
                 // Show what was created
-                const createdType = result.project.files['index.html'] ? 
-                    result.project.files['index.html'].includes('button') ? 'button' : 
-                    result.project.files['index.html'].includes('canvas') ? 'drawing' : 'element' : 'code';
-                
-                this.status.textContent = `Created ${createdType}! Tap to add more...`;
-                this.showCodePanel();
+                this.status.textContent = 'Code executed! Tap anywhere to continue...';
                 
                 // Keep clicks for building on, but reset after 3 seconds of inactivity
                 this.scheduleClickReset();
@@ -204,6 +199,69 @@ class TapToCode {
         } finally {
             this.showProgress(false);
         }
+    }
+    
+    async executeGeneratedCode(project) {
+        // Create a plugin system
+        const pluginId = 'plugin_' + Date.now();
+        
+        // Store plugin
+        if (!window.appPlugins) window.appPlugins = [];
+        window.appPlugins.push({
+            id: pluginId,
+            code: project,
+            timestamp: Date.now()
+        });
+        
+        // Execute HTML
+        if (project.files['index.html']) {
+            const container = document.createElement('div');
+            container.id = pluginId;
+            container.innerHTML = project.files['index.html'];
+            document.body.appendChild(container);
+        }
+        
+        // Execute CSS
+        if (project.files['styles.css']) {
+            const style = document.createElement('style');
+            style.id = pluginId + '_style';
+            style.textContent = project.files['styles.css'];
+            document.head.appendChild(style);
+        }
+        
+        // Execute JavaScript
+        if (project.files['script.js']) {
+            try {
+                const func = new Function(project.files['script.js']);
+                func.call({
+                    pluginId,
+                    clicks: this.clicks,
+                    project
+                });
+            } catch (e) {
+                console.error('Plugin execution error:', e);
+            }
+        }
+        
+        // Update the code panel
+        this.currentProject = project;
+        this.renderer.render(project);
+        this.showCodePanel();
+    }
+    
+    // Add plugin management
+    removePlugin(pluginId) {
+        const plugin = document.getElementById(pluginId);
+        const style = document.getElementById(pluginId + '_style');
+        if (plugin) plugin.remove();
+        if (style) style.remove();
+        
+        window.appPlugins = window.appPlugins.filter(p => p.id !== pluginId);
+    }
+    
+    updatePlugin(pluginId, newProject) {
+        this.removePlugin(pluginId);
+        this.executeGeneratedCode(newProject);
     }
     
     scheduleClickReset() {

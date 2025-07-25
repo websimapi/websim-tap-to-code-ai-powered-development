@@ -65,76 +65,100 @@ Respond with JSON: {"success": true, "project": {"files": {"index.html": "...", 
         let html = '', css = '', js = '';
         
         if (clickCount === 1) {
-            // Single click - immediately create something
-            html = `<button class="magic-btn" style="left:${positions[0].x}px; top:${positions[0].y}px;">✨ Magic</button>`;
+            // Single click - immediately create something interactive
+            html = `<div class="interactive-btn" id="btn-${Date.now()}" style="position:absolute; left:${positions[0].x}px; top:${positions[0].y}px;">
+                <button>Click Me!</button>
+            </div>`;
+            
             css = `
-.magic-btn {
+.interactive-btn {
     position: absolute;
-    padding: 15px 25px;
-    background: linear-gradient(45deg, #ff006e, #00ff88);
+    transform: translate(-50%, -50%);
+}
+.interactive-btn button {
+    padding: 15px 30px;
+    background: linear-gradient(45deg, #00ff88, #0099ff);
     border: none;
-    border-radius: 30px;
+    border-radius: 25px;
     color: white;
     font-size: 16px;
     cursor: pointer;
-    transform: translate(-50%, -50%);
     transition: all 0.3s ease;
-    box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+    box-shadow: 0 4px 15px rgba(0, 255, 136, 0.4);
 }
-.magic-btn:hover {
-    transform: translate(-50%, -50%) scale(1.1);
-    box-shadow: 0 0 30px rgba(0, 255, 136, 0.8);
+.interactive-btn button:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 25px rgba(0, 255, 136, 0.6);
 }`;
+            
             js = `
-document.querySelector('.magic-btn').addEventListener('click', (e) => {
-    e.target.style.background = \`linear-gradient(45deg, #${Math.floor(Math.random()*16777215).toString(16)}, #${Math.floor(Math.random()*16777215).toString(16)})\`;
-    e.target.textContent = '✨ ' + ['Amazing!', 'Cool!', 'Wow!', 'Nice!'][Math.floor(Math.random()*4)];
+const btn = document.querySelector('#btn-${Date.now()} button');
+let clickCount = 0;
+btn.addEventListener('click', () => {
+    clickCount++;
+    btn.textContent = \`Clicked \${clickCount} times!\`;
+    btn.style.background = \`linear-gradient(45deg, #${Math.floor(Math.random()*16777215).toString(16)}, #${Math.floor(Math.random()*16777215).toString(16)})\`;
+    
+    if (clickCount % 5 === 0) {
+        btn.textContent = '🎉 WOW!';
+        setTimeout(() => btn.textContent = 'Click Me!', 1000);
+    }
 });`;
         } else if (clickCount === 2) {
-            // Two clicks - create a connection
-            html = `<div class="connection-line"></div>`;
+            // Two clicks - create a draggable line
+            html = `<svg class="dynamic-line" style="position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none;">
+                <line x1="${positions[0].x}" y1="${positions[0].y}" 
+                      x2="${positions[1].x}" y2="${positions[1].y}" 
+                      stroke="#00ff88" stroke-width="3" />
+            </svg>`;
+            
             css = `
-.connection-line {
-    position: absolute;
-    left: ${positions[0].x}px;
-    top: ${positions[0].y}px;
-    width: ${Math.sqrt(Math.pow(positions[1].x - positions[0].x, 2) + Math.pow(positions[1].y - positions[0].y, 2))}px;
-    height: 3px;
-    background: linear-gradient(90deg, #00ff88, #ff006e);
-    transform: rotate(${Math.atan2(positions[1].y - positions[0].y, positions[1].x - positions[0].x)}rad);
-    transform-origin: 0 50%;
-    box-shadow: 0 0 20px rgba(0, 255, 136, 0.8);
-    animation: pulse 2s infinite;
+.dynamic-line line {
+    stroke-dasharray: 5;
+    animation: dash 2s linear infinite;
 }
-@keyframes pulse {
-    0%, 100% { opacity: 0.7; }
-    50% { opacity: 1; }
+@keyframes dash {
+    to { stroke-dashoffset: -10; }
 }`;
-            js = `// Connection line created between points`;
-        } else {
-            // 3+ clicks - create a shape
-            const points = positions.map(p => `${p.x}px ${p.y}px`).join(', ');
-            html = `<div class="user-shape"></div>`;
-            css = `
-.user-shape {
-    position: absolute;
-    width: 0;
-    height: 0;
-    border: 2px solid #00ff88;
-    box-shadow: 0 0 30px rgba(0, 255, 136, 0.5);
-    ${positions.length === 3 ? `clip-path: polygon(${points});` : ''}
-    background: rgba(0, 255, 136, 0.1);
-    animation: glow 3s infinite alternate;
-}
-@keyframes glow {
-    from { filter: brightness(1); }
-    to { filter: brightness(1.5); }
-}`;
+            
             js = `
-// Interactive shape created from user clicks
-document.querySelector('.user-shape').addEventListener('click', () => {
-    this.style.transform = 'scale(1.2)';
-    setTimeout(() => this.style.transform = 'scale(1)', 300);
+const line = document.querySelector('.dynamic-line line');
+let offset = 0;
+setInterval(() => {
+    offset += 0.5;
+    const x1 = parseFloat(line.getAttribute('x1'));
+    const y1 = parseFloat(line.getAttribute('y1'));
+    const x2 = parseFloat(line.getAttribute('x2'));
+    const y2 = parseFloat(line.getAttribute('y2'));
+    
+    line.setAttribute('x2', x2 + Math.sin(offset) * 10);
+    line.setAttribute('y2', y2 + Math.cos(offset) * 10);
+}, 50);`;
+        } else {
+            // 3+ clicks - create a dynamic shape
+            const points = positions.map(p => `${p.x},${p.y}`).join(' ');
+            html = `<polygon class="user-polygon" points="${points}" style="position:absolute; left:0; top:0;" />`;
+            
+            css = `
+.user-polygon {
+    fill: rgba(0, 255, 136, 0.2);
+    stroke: #00ff88;
+    stroke-width: 2;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+.user-polygon:hover {
+    fill: rgba(0, 255, 136, 0.4);
+    stroke: #fff;
+}`;
+            
+            js = `
+const polygon = document.querySelector('.user-polygon');
+let scale = 1;
+polygon.addEventListener('click', () => {
+    scale = scale === 1 ? 1.2 : 1;
+    polygon.style.transform = \`scale(\${scale})\`;
+    polygon.style.transformOrigin = 'center';
 });`;
         }
         

@@ -183,13 +183,16 @@ class TapToCode {
             const result = await this.ai.generateCode(interpretation);
             
             if (result.success) {
-                // Execute the generated code directly
-                await this.executeGeneratedCode(result.project);
+                // Handle plugin creation/modification
+                if (result.action === 'modify' && result.targetPlugin) {
+                    // Update existing plugin
+                    this.updatePlugin(result.targetPlugin, result.project);
+                } else {
+                    // Create new plugin
+                    await this.executeGeneratedCode(result.project);
+                }
                 
-                // Show what was created
-                this.status.textContent = 'Code executed! Tap anywhere to continue...';
-                
-                // Keep clicks for building on, but reset after 3 seconds of inactivity
+                this.status.textContent = `Plugin ${result.action}d! Tap anywhere to continue...`;
                 this.scheduleClickReset();
             }
         } catch (error) {
@@ -200,48 +203,33 @@ class TapToCode {
             this.showProgress(false);
         }
     }
-    
-    async executeGeneratedCode(project) {
-        // Create a plugin system
-        const pluginId = 'plugin_' + Date.now();
+
+    async executeGeneratedCode(project, targetPlugin = null) {
+        const pluginId = targetPlugin || 'plugin_' + Date.now();
         
-        // Store plugin
         if (!window.appPlugins) window.appPlugins = [];
-        window.appPlugins.push({
+        
+        // Store plugin with metadata
+        const pluginData = {
             id: pluginId,
             code: project,
-            timestamp: Date.now()
-        });
+            timestamp: Date.now(),
+            version: 1
+        };
         
-        // Execute HTML
-        if (project.files['index.html']) {
-            const container = document.createElement('div');
-            container.id = pluginId;
-            container.innerHTML = project.files['index.html'];
-            document.body.appendChild(container);
-        }
-        
-        // Execute CSS
-        if (project.files['styles.css']) {
-            const style = document.createElement('style');
-            style.id = pluginId + '_style';
-            style.textContent = project.files['styles.css'];
-            document.head.appendChild(style);
-        }
-        
-        // Execute JavaScript
-        if (project.files['script.js']) {
-            try {
-                const func = new Function(project.files['script.js']);
-                func.call({
-                    pluginId,
-                    clicks: this.clicks,
-                    project
-                });
-            } catch (e) {
-                console.error('Plugin execution error:', e);
+        if (targetPlugin) {
+            // Update existing plugin
+            const index = window.appPlugins.findIndex(p => p.id === targetPlugin);
+            if (index !== -1) {
+                window.appPlugins[index] = pluginData;
             }
+        } else {
+            // Add new plugin
+            window.appPlugins.push(pluginData);
         }
+        
+        // Execute the plugin
+        this.renderPlugin(pluginData);
         
         // Update the code panel
         this.currentProject = project;
@@ -249,14 +237,73 @@ class TapToCode {
         this.showCodePanel();
     }
     
-    // Add plugin management
+    renderPlugin(pluginData) {
+        const container = document.getElementById('plugin-container');
+        
+        // Remove existing plugin if modifying
+        if (pluginData.id) {
+            const existing = document.getElementById(pluginData.id);
+            if (existing) existing.remove();
+            
+            const existingStyle = document.getElementById(pluginData.id + '_style');
+            if (existingStyle) existingStyle.remove();
+        }
+        
+        const { files } = pluginData.code;
+        
+        // Execute HTML
+        if (files['index.html']) {
+            const pluginDiv = document.createElement('div');
+            pluginDiv.id = pluginData.id;
+            pluginDiv.style.position = 'absolute';
+            pluginDiv.style.top = '0';
+            pluginDiv.style.left = '0';
+            pluginDiv.style.width = '100%';
+            pluginDiv.style.height = '100%';
+            pluginDiv.style.pointerEvents = 'auto';
+            pluginDiv.innerHTML = files['index.html'];
+            container.appendChild(pluginDiv);
+        }
+        
+        // Execute CSS
+        if (files['styles.css']) {
+            const style = document.createElement('style');
+            style.id = pluginData.id + '_style';
+            style.textContent = files['styles.css'];
+            document.head.appendChild(style);
+        }
+        
+        // Execute JavaScript
+        if (files['script.js']) {
+            try {
+                const func = new Function('pluginId', 'clicks', 'project', files['script.js']);
+                func.call(this, pluginData.id, this.clicks, pluginData.code);
+            } catch (e) {
+                console.error('Plugin execution error:', e);
+            }
+        }
+    }
+    
+    // Enhanced plugin management
     removePlugin(pluginId) {
         const plugin = document.getElementById(pluginId);
         const style = document.getElementById(pluginId + '_style');
+        
         if (plugin) plugin.remove();
         if (style) style.remove();
         
         window.appPlugins = window.appPlugins.filter(p => p.id !== pluginId);
+    }
+    
+    listPlugins() {
+        return window.appPlugins || [];
+    }
+    
+    clearAllPlugins() {
+        (window.appPlugins || []).forEach(plugin => {
+            this.removePlugin(plugin.id);
+        });
+        window.appPlugins = [];
     }
     
     updatePlugin(pluginId, newProject) {

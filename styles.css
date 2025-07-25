@@ -43,34 +43,49 @@ body {
     top: 20px;
     left: 20px;
     z-index: 10;
+    max-width: 300px;
 }
 
 #status {
     background: rgba(0, 255, 136, 0.1);
     border: 1px solid var(--accent);
-    padding: 10px 20px;
-    border-radius: 4px;
+    padding: 12px 20px;
+    border-radius: 8px;
     font-size: 14px;
     margin-bottom: 10px;
     backdrop-filter: blur(10px);
+    line-height: 1.4;
 }
 
 #pattern-indicator {
     display: flex;
-    gap: 4px;
+    gap: 6px;
+    flex-wrap: wrap;
 }
 
 .pattern-dot {
-    width: 8px;
-    height: 8px;
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
     background: var(--muted);
     transition: all 0.3s ease;
+    animation: pulseIn 0.3s ease;
 }
 
 .pattern-dot.active {
     background: var(--accent);
-    box-shadow: 0 0 10px var(--accent);
+    box-shadow: 0 0 15px var(--accent);
+}
+
+@keyframes pulseIn {
+    from {
+        transform: scale(0);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
 }
 
 #code-panel {
@@ -79,12 +94,13 @@ body {
     top: 20px;
     width: 400px;
     height: 70vh;
-    background: rgba(26, 26, 26, 0.9);
-    border: 1px solid #333;
-    border-radius: 8px;
+    background: rgba(26, 26, 26, 0.95);
+    border: 1px solid rgba(0, 255, 136, 0.2);
+    border-radius: 12px;
     backdrop-filter: blur(20px);
     display: none;
     flex-direction: column;
+    box-shadow: 0 0 30px rgba(0, 255, 136, 0.1);
 }
 
 #file-tabs {
@@ -93,31 +109,40 @@ body {
 }
 
 .file-tab {
-    padding: 10px 15px;
+    padding: 12px 20px;
     background: transparent;
     border: none;
     color: var(--muted);
     cursor: pointer;
     transition: all 0.3s ease;
+    font-size: 13px;
+}
+
+.file-tab:hover {
+    color: var(--accent);
+    background: rgba(0, 255, 136, 0.1);
 }
 
 .file-tab.active {
     background: rgba(0, 255, 136, 0.1);
     color: var(--accent);
+    border-bottom: 2px solid var(--accent);
 }
 
 #code-display {
     flex: 1;
     padding: 20px;
     overflow-y: auto;
-    font-size: 12px;
-    line-height: 1.5;
+    font-size: 13px;
+    line-height: 1.6;
     color: var(--text);
+    background: var(--bg-secondary);
+    border-radius: 0 0 12px 12px;
 }
 
 #ai-status {
     position: absolute;
-    bottom: 20px;
+    bottom: 30px;
     left: 50%;
     transform: translateX(-50%);
     text-align: center;
@@ -126,6 +151,8 @@ body {
 #ai-thinking {
     font-size: 14px;
     color: var(--muted);
+    display: block;
+    margin-bottom: 5px;
 }
 
 #progress-bar {
@@ -157,7 +184,11 @@ body {
 }
 
 @keyframes ripple {
-    to {
+    0% {
+        transform: scale(0);
+        opacity: 1;
+    }
+    100% {
         transform: scale(3);
         opacity: 0;
     }
@@ -165,11 +196,11 @@ body {
 
 .pattern-recognition {
     position: absolute;
-    background: rgba(0, 255, 136, 0.1);
+    background: radial-gradient(circle, rgba(0, 255, 136, 0.2) 0%, transparent 70%);
     border: 1px solid var(--accent);
     border-radius: 50%;
     pointer-events: none;
-    animation: patternPulse 1s ease-out;
+    animation: patternPulse 1.5s ease-out;
 }
 
 @keyframes patternPulse {
@@ -178,8 +209,26 @@ body {
         opacity: 1;
     }
     100% {
-        transform: scale(2);
+        transform: scale(3);
         opacity: 0;
     }
 }
 
+/* Scrollbar styling */
+#code-display::-webkit-scrollbar {
+    width: 6px;
+}
+
+#code-display::-webkit-scrollbar-track {
+    background: var(--bg-primary);
+}
+
+#code-display::-webkit-scrollbar-thumb {
+    background: var(--accent);
+    border-radius: 3px;
+}
+
+.position-label {
+    pointer-events: none;
+    user-select: none;
+}
